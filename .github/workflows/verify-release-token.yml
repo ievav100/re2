@@ -1,0 +1,56 @@
+name: Verify release token scope
+
+on:
+  push:
+    branches: [codex/verify-release-token]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download public release archives without a checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          test ! -e .git
+          mkdir "$RUNNER_TEMP/re2-public-archives"
+          cd "$RUNNER_TEMP/re2-public-archives"
+          gh release download 2025-11-05 --archive tar.gz --repo google/re2
+          gh release download 2025-11-05 --archive zip --repo google/re2
+          shopt -s nullglob
+          tarballs=(*.tar.gz)
+          zipfiles=(*.zip)
+          test "${#tarballs[@]}" -eq 1
+          test "${#zipfiles[@]}" -eq 1
+          tar -tzf "${tarballs[0]}" >/dev/null
+          unzip -tq "${zipfiles[0]}" >/dev/null
+          echo "GitHub CLI downloaded both formats without a checkout."
+      - name: Prepare signing fixtures without the release token
+        shell: bash
+        run: |
+          test ! -e .git
+          test -z "${GH_TOKEN+x}"
+          printf '%s\n' 'Synthetic RE2 workflow test fixture' > fixture.txt
+          tar -czf fixture.tar.gz fixture.txt
+          zip -q fixture.zip fixture.txt
+      - uses: sigstore/gh-action-sigstore-python@v3.0.1
+        with:
+          inputs: '*.tar.gz *.zip'
+          staging: 'true'
+          verify: 'true'
+          verify-cert-identity: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/verify-release-token.yml@${{ github.ref }}
+          verify-oidc-issuer: https://token.actions.githubusercontent.com
+      - name: Verify the presence of both signature bundles
+        shell: bash
+        run: |
+          test -z "${GH_TOKEN+x}"
+          compgen -G 'fixture.tar.gz.sigstore*'
+          compgen -G 'fixture.zip.sigstore*'
