@@ -47,7 +47,7 @@ jobs:
       - uses: sigstore/gh-action-sigstore-python@50941ad9c4f5e626d9120c73ad0a4f317c5f7b01 # sigstore-python 4.5.1
         with:
           inputs: '*.tar.gz *.zip'
-          staging: 'true'
+          staging: 'false'
           verify: 'true'
           verify-cert-identity: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/verify-release-token.yml@${{ github.ref }}
           verify-oidc-issuer: https://token.actions.githubusercontent.com
