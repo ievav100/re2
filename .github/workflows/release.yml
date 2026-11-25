@@ -1,11 +1,14 @@
-name: Release
+name: Verify RE2 draft release signing
 on:
   push:
-    tags: ['2[0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'] # yyyy-mm-dd
+    branches: [codex/verify-re2-draft-release-20261125]
 permissions:
   contents: read
 jobs:
   create:
+    if: github.repository == 'ievav100/re2'
+    env:
+      TEST_TAG: re2-ci-draft-20261125
     permissions:
       # Required to create the release
       # and upload the release assets.
@@ -18,39 +21,34 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            --generate-notes --latest --verify-tag \
+          gh release create "${TEST_TAG}" \
+            --generate-notes --draft --verify-tag \
             --repo "${GITHUB_REPOSITORY}"
-          gh release download "${GITHUB_REF_NAME}" \
+          gh release download "${TEST_TAG}" \
             --archive tar.gz \
             --repo "${GITHUB_REPOSITORY}"
-          gh release download "${GITHUB_REF_NAME}" \
+          gh release download "${TEST_TAG}" \
             --archive zip \
             --repo "${GITHUB_REPOSITORY}"
         shell: bash
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
+      - name: Check release token scope before signing
+        run: test -z "${GH_TOKEN:-}" && test -z "${GITHUB_TOKEN:-}"
+        shell: bash
       - uses: sigstore/gh-action-sigstore-python@50941ad9c4f5e626d9120c73ad0a4f317c5f7b01 # sigstore-python 4.5.1
         with:
           # N.B. This is a whitespace-separated string!
           inputs: '*.tar.gz *.zip'
+      - name: Check release token scope after signing
+        run: test -z "${GH_TOKEN:-}" && test -z "${GITHUB_TOKEN:-}"
+        shell: bash
       - name: Upload signed release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${GITHUB_REF_NAME}" \
+          gh release upload "${TEST_TAG}" \
             *.tar.gz *.zip *.sigstore* \
             --repo "${GITHUB_REPOSITORY}"
         shell: bash
-  create-bazel:
-    needs: create
-    uses: ./.github/workflows/release-bazel.yml
-    with:
-      tag_name: ${{ github.ref_name }}
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
-    secrets:
-      BCR_PUBLISH_TOKEN: ${{ secrets.BCR_PUBLISH_TOKEN }}
