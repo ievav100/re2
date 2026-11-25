@@ -8,7 +8,7 @@ jobs:
   create:
     if: github.repository == 'ievav100/re2'
     env:
-      TEST_TAG: re2-ci-draft-20261125
+      TEST_TAG: re2-ci-draft-20261125-v2
     permissions:
       # Required to create the release
       # and upload the release assets.
@@ -24,12 +24,12 @@ jobs:
           gh release create "${TEST_TAG}" \
             --generate-notes --draft --verify-tag \
             --repo "${GITHUB_REPOSITORY}"
-          gh release download "${TEST_TAG}" \
-            --archive tar.gz \
-            --repo "${GITHUB_REPOSITORY}"
-          gh release download "${TEST_TAG}" \
-            --archive zip \
-            --repo "${GITHUB_REPOSITORY}"
+          test "$(gh release view "${TEST_TAG}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft)" = true
+          # GitHub exposes tagged source archives independently of the draft release.
+          gh api "repos/${GITHUB_REPOSITORY}/tarball/refs/tags/${TEST_TAG}" > "re2-${TEST_TAG}.tar.gz"
+          gh api "repos/${GITHUB_REPOSITORY}/zipball/refs/tags/${TEST_TAG}" > "re2-${TEST_TAG}.zip"
+          tar -tzf "re2-${TEST_TAG}.tar.gz" > /dev/null
+          unzip -tq "re2-${TEST_TAG}.zip"
         shell: bash
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
